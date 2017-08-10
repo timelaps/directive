@@ -10,7 +10,7 @@ var DIRECTIVE = 'Directive',
      * Directives are a powerful way to organize your code, logic, and state of the objects you create during an app's lifespan. Directives allow for the ability to replace large chunks of internal code of classes and completely change an object's behavior. Directives are one of the more basic objects Odette provides
      * @class Directive
      */
-    Directive = Classy.extend('Directive', {
+    Directive = module.exports = Classy.extend('Directive', {
         lifecycle: {
             created: function (supr, arg) {
                 if (!isNil(arg)) {
