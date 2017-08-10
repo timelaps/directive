@@ -10,26 +10,25 @@ var DIRECTIVE = 'Directive',
      * Directives are a powerful way to organize your code, logic, and state of the objects you create during an app's lifespan. Directives allow for the ability to replace large chunks of internal code of classes and completely change an object's behavior. Directives are one of the more basic objects Odette provides
      * @class Directive
      */
-    Directive = Classy.extend('Directive',
+    Directive = Classy.extend('Directive', {
+        lifecycle: {
+            created: function (supr, arg) {
+                if (!isNil(arg)) {
+                    this.target = arg;
+                }
+                supr(arg);
+            }
+        },
         /**
          * @lends Directive.prototype
          */
-        {
-            lifecycle: {
-                created: function (supr, arg) {
-                    if (!isNil(arg)) {
-                        this.target = arg;
-                    }
-                    supr(arg);
-                }
-            },
-            methods: {
-                getDirective: basicSingleArgumentPassthrough(getDirective),
-                directive: basicSingleArgumentPassthrough(createDirective),
-                destroyDirective: basicSingleArgumentPassthrough(destroyDirective),
-                getDirectiveClass: basicSingleArgumentPassthrough(getDirectiveClass)
-            }
-        });
+        methods: {
+            getDirective: basicSingleArgumentPassthrough(getDirective),
+            directive: basicSingleArgumentPassthrough(createDirective),
+            destroyDirective: basicSingleArgumentPassthrough(destroyDirective),
+            getDirectiveClass: basicSingleArgumentPassthrough(getDirectiveClass)
+        }
+    });
 Directive.parody = parody;
 Directive.checkParody = checkParody;
 Directive.create = createDirective;
@@ -92,12 +91,8 @@ function createDirective(origin, name) {
     return handler;
 }
 
-function directiveAccessError() {
-    throws({
+function getDirectiveClass(origin, name) {
+    return origin['directive.' + name] || scope.get(name) || throws({
         message: 'Directive must be defined before it can be created.'
     });
-}
-
-function getDirectiveClass(origin, name) {
-    return origin['directive.' + name] || scope.get(name) || directiveAccessError();
 }
