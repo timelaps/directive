@@ -1,3 +1,3 @@
 var b = require('@timelaps/batterie');
-var func = require('.');
-b.expect(func).toBeFunction();
+var Directive = require('.');
+b.expect(Directive).toBeFunction();

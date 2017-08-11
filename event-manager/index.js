@@ -20,9 +20,10 @@ var PROPAGATION = 'propagation',
     forEach = require('@timelaps/hacks/for/each'),
     returnsFirst = require('@timelaps/returns/first'),
     del = require('@timelaps/n/del/shallow'),
-    toBoolean = require('@timelaps/hacks/to-boolean');
+    toBoolean = require('@timelaps/hacks/to-boolean'),
+    wraptry = require('@timelaps/fn/wrap-try'),
+    forEachEnd = require('@timelaps/n/for/each/end');
 module.exports = Directive.extend('Events', {
-    propagationIsStopped: returnsFalse,
     create: returnsFirst,
     constructor: function (target) {
         var directive = this;
@@ -162,45 +163,43 @@ module.exports = Directive.extend('Events', {
     handlerQueue: function (name) {
         return this.handlers[key] || [];
     },
-    dispatch: function (name, evnt) {
+    dispatch: function (name, options) {
         var subset, stopped, stack_length, events = this,
             stack = events[STACK],
             handlers = events[HANDLERS],
             list = handlers[name],
-            running = events.running,
-            // prevents infinite loops
-            cached = running[name];
+            running = events.running;
         // make sure setup is proper
-        if (cached) {
-            console.error('cannot stack events coming from the same object');
-            return;
-        }
-        if (events.propagationIsStopped(evnt)) {
-            return;
-        }
-        running[name] = true;
-        subset = events.subset(list.items, evnt);
-        stack_length = stack.length;
-        var handler, j = 0,
-            i = 0,
-            subLength = subset && subset.length;
-        for (; i < subLength && !stopped; i++) {
-            handler = subset[i];
-            if (!handler.disabled && events.queue(stack, handler, evnt)) {
-                handler.fn(evnt);
-                events.unQueue(stack, handler, evnt);
+        if (running[name]) {
+            throws('cannot stack events coming from the same object');
+        } else {
+            running[name] = true;
+            subset = events.subset(list.items, options);
+            if (subset && subset.length) {
+                events.execute(options, subset);
             }
-            stopped = !!evnt.is(PROPAGATION_HALTED);
+            running[name] = false;
+            events.finished(evnt);
         }
-        if (stack_length < stack.length) {
-            events.unQueue(stack, handler, evnt);
-        }
-        evnt.finished();
-        running[name] = !!cached;
-        return toBoolean(i);
     },
     subset: function (list) {
         return list.slice(0);
+    },
+    execute: function (options, subset) {
+        var events = this,
+            evnt = events.create(options),
+            result = forEachEnd(subset, function (handler) {
+                if (!handler.disabled && events.queue(stack, handler, evnt)) {
+                    wraptry(tries, console.error);
+                    events.unQueue(stack, handler, evnt);
+                }
+                return events.propagationIsHalted(evnt);
+
+                function tries() {
+                    handler.fn(evnt);
+                }
+            });
+        return isUndefined(result) && toBoolean(subset && subset.length);
     }
 });
 
