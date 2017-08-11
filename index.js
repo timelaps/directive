@@ -49,7 +49,11 @@ function parody(directive, method) {
 }
 
 function getAssociatedHash(origin) {
-    return origin.directiveInstances;
+    var instances = origin.directiveInstances;
+    if (!instances) {
+        instances = origin.directiveInstances = {};
+    }
+    return instances;
 }
 
 function getDirective(origin, name) {
@@ -78,21 +82,17 @@ function destroyDirective(origin, name) {
 }
 
 function createDirective(origin, name) {
-    var Class, handler, directive,
-        directiveInstances = origin.directiveInstances;
-    if (!directiveInstances) {
-        directiveInstances = origin.directiveInstances = {};
-    }
-    if ((directive = directiveInstances[name])) {
+    var Class, instance, directive;
+    if ((directive = getDirective(origin, name))) {
         return directive;
     }
     Class = origin.getDirectiveClass(name);
-    handler = directiveInstances[name] = new Class(origin, name);
-    return handler;
+    instance = origin.directiveInstances[name] = new Class(origin, name);
+    return instance;
 }
 
 function getDirectiveClass(origin, name) {
     return origin['directive.' + name] || scope.get(name) || throws({
-        message: 'Directive must be defined before it can be created.'
+        message: 'Directive must be defined before it can be accessed.'
     });
 }

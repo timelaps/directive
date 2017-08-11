@@ -2,7 +2,9 @@ var toFunction = require('@timelaps/to/function');
 var isString = require('@timelaps/is/string');
 var throws = require('@timelaps/fn/throws');
 var isFunction = require('@timelaps/is/function');
-module.exports = function () {
+module.exports = maker;
+
+function maker() {
     var base = {
         creation: {},
         destruction: {}
@@ -38,4 +40,4 @@ module.exports = function () {
             return Destruction(instance, name, directives.destruction[oldName](instance, name, third));
         });
     }
-};
+}
