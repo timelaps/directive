@@ -6,35 +6,75 @@ var DIRECTIVE = 'Directive',
     isNil = require('@timelaps/is/nil'),
     returnsObject = require('@timelaps/returns/object'),
     scope = require('./global'),
+    create = require('@timelaps/object/create'),
+    assign = require('@timelaps/object/assign'),
     /**
      * Directives are a powerful way to organize your code, logic, and state of the objects you create during an app's lifespan. Directives allow for the ability to replace large chunks of internal code of classes and completely change an object's behavior. Directives are one of the more basic objects Odette provides
      * @class Directive
      */
     Directive = module.exports = Classy.extend('Directive', {
         lifecycle: {
-            created: function (supr, arg) {
-                if (!isNil(arg)) {
-                    this.target = arg;
+            created: function (supr, origin, name) {
+                var directive = this;
+                if (origin) {
+                    directive.target = origin;
+                    origin.directiveInstances[name] = directive;
+                    directive.targetKey = name;
                 }
+                supr(origin);
+            },
+            destroyed: function (supr, arg) {
+                var origin = this.target;
                 supr(arg);
+                if (origin) {
+                    delete this.target;
+                    delete origin.directiveInstances[this.targetKey];
+                    delete this.targetKey;
+                }
             }
         },
         /**
          * @lends Directive.prototype
          */
         methods: {
+            getDirectiveClass: basicSingleArgumentPassthrough(getDirectiveClass),
             getDirective: basicSingleArgumentPassthrough(getDirective),
             directive: basicSingleArgumentPassthrough(createDirective),
-            destroyDirective: basicSingleArgumentPassthrough(destroyDirective),
-            getDirectiveClass: basicSingleArgumentPassthrough(getDirectiveClass)
+            createDirective: function (name) {
+                var origin = this,
+                    Class = origin.getDirectiveClass(name);
+                return new Class([origin, name]);
+            }
         }
     });
+reextend(Directive);
+Directive.fn.directives = create({
+    Directive: Directive.constructor
+});
+
+function reextend(Directive) {
+    var extend = Directive.extend;
+    Directive.extend = Directive.constructor.extend = nuExtend;
+    return Directive;
+
+    function nuExtend(name) {
+        var result = reextend(extend.apply(this, arguments));
+        result.fn.directives = assign(create(this.fn.directives), result.extensionOptions.directives || {});
+        return result;
+    }
+}
+Directive.access = access;
 Directive.parody = parody;
 Directive.checkParody = checkParody;
 Directive.create = createDirective;
-Directive.destroy = destroyDirective;
 Directive.get = getDirective;
 Directive.getClass = getDirectiveClass;
+
+function access(key) {
+    return function () {
+        return this.directive(key);
+    };
+}
 
 function basicSingleArgumentPassthrough(method) {
     return function (key) {
@@ -57,7 +97,8 @@ function getAssociatedHash(origin) {
 }
 
 function getDirective(origin, name) {
-    return getAssociatedHash(origin)[name];
+    var hash = getAssociatedHash(origin);
+    return hash && hash[name];
 }
 
 function checkParody(name, method, defaultValue) {
@@ -72,10 +113,10 @@ function returnsThird(one, two, three) {
     return three;
 }
 
-function destroyDirective(origin, name) {
+function destroyDirective(origin, name, opts) {
     var directive, result = null;
-    if ((directive = getDirective(origin, name)) && directive.mark('destroying')) {
-        result = (globalDirectives.destruction[name] || returnsNull)(getDirective(origin, name), origin, name);
+    if ((directive = getDirective(origin, name))) {
+        result = directive.destroy(opts);
         delete origin[name];
     }
     return result;
@@ -86,13 +127,10 @@ function createDirective(origin, name) {
     if ((directive = getDirective(origin, name))) {
         return directive;
     }
-    Class = origin.getDirectiveClass(name);
-    instance = origin.directiveInstances[name] = new Class(origin, name);
+    instance = origin.directiveInstances[name] = origin.createDirective(name);
     return instance;
 }
 
 function getDirectiveClass(origin, name) {
-    return origin['directive.' + name] || scope.get(name) || throws({
-        message: 'Directive must be defined before it can be accessed.'
-    });
+    return origin.directives[name];
 }

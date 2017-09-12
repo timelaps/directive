@@ -1,34 +1,47 @@
 var Directive = require('..'),
-    Promise = require('@timelaps/promise'),
+    Promise = require('@timelaps/promise/sync'),
     intendedApi = require('@timelaps/fn/intended/api'),
     isThennable = require('@timelaps/is/thennable'),
     toFunction = require('@timelaps/to/function'),
-    bindTo = require('@timelaps/fn/bind/to');
-module.exports = Directive.factory('Messenger', function (supr, arg) {
-    supr(arg);
-    var messenger = this,
-        responders = {},
-        callers = {};
-    messenger.call = function (key, arg) {
-        return callers && callers[key] && callers[key](arg);
-    };
-    messenger.request = function (key, arg) {
-        return (responders && responders[key]) ? responders[key](arg) : Promise.reject();
-    };
-    messenger.answer = intendedApi(function (key, handler) {
-        if (!callers) {
-            return;
+    bindTo = require('@timelaps/fn/bind/to'),
+    Messenger = module.exports = Directive.extend('Messenger', {
+        lifecycle: {
+            created: function (supr) {
+                supr();
+                var messenger = this,
+                    responders = {},
+                    callers = {};
+                messenger.call = function (key, arg) {
+                    var method;
+                    if (callers) {
+                        return (method = callers[key]) && method(arg);
+                    }
+                };
+                messenger.request = function (key, arg) {
+                    var method;
+                    if (responders) {
+                        return ((method = responders[key])) ? method(arg) : Promise.reject();
+                    }
+                };
+                messenger.answer = intendedApi(function (key, handler) {
+                    if (callers) {
+                        callers[key] = toFunction(handler);
+                    }
+                });
+                messenger.respond = intendedApi(function (key, handler_) {
+                    var handler = toFunction(handler_);
+                    return responders && (responders[key] = function () {
+                        var result;
+                        return isThennable(result = handler.apply(this, arguments)) ? result : Promise.resolve(result);
+                    });
+                });
+                messenger.reset = function () {
+                    responders = callers = null;
+                };
+            },
+            destroyed: function (supr) {
+                supr();
+                this.reset();
+            }
         }
-        callers[key] = bindTo(toFunction(handler), null);
     });
-    messenger.respond = intendedApi(function (key, handler) {
-        return responders && (responders[key] = function (arg) {
-            var result;
-            return isThennable(result = handler()) ? result : Promise.resolve(result);
-        });
-    });
-    messenger.destroy = function () {
-        Messenger.fn.destroy.apply(this, arguments);
-        responders = callers = null;
-    };
-});
